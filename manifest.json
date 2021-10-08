@@ -1,7 +1,7 @@
 {
-    "name": "DevToolsPanel",
-    "version": "0.1",
-    "description": "A bare-bones example of communication between devtools and an inspected page",
+    "name": "UserTimestamps",
+    "version": "1.0",
+    "description": "Simply tracks user interactions and writes them in FFMPEG Metadata format",
     "devtools_page": "devtools.html",
     "background": {
         "scripts": [
@@ -11,7 +11,17 @@
     "permissions": [
         "tabs", 
         "http://*/*",
-        "https://*/*"
+        "https://*/*",
     ],
+    "content_scripts": [{
+        "matches": [
+          "http://*/*",
+          "https://*/*",
+          "file://*"
+        ],
+        "js": ["messageback-script.js"],
+        "all_frames": true,
+        "run_at": "document_start"
+      }],
     "manifest_version": 2
 }
