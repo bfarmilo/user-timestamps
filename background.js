@@ -19,13 +19,17 @@ chrome.runtime.onConnect.addListener(function (port) {
 
         if (message.tabId && message.content) {
 
-                //Evaluate script in inspectedPage
-                if(message.action === 'code') {
-                    chrome.tabs.executeScript(message.tabId, {code: message.content}); 
+            //Evaluate script in inspectedPage
+            if (message.action === 'code') {
+                chrome.tabs.executeScript(message.tabId, { code: message.content });
 
                 //Attach script to inspectedPage
-                } else if (message.action === 'script') {
-                    chrome.scripting.executeScript(message.tabId, { file: message.content });
+            } else if (message.action === 'script') {
+                chrome.tabs.executeScript(message.tabId, { file: message.content });
+
+            } else if (message.action === 'message') {
+                // send to the console
+                chrome.tabs.executeScript(message.tabId, { code: `console.log("${message.content}")` });
 
                 //Pass message to inspectedPage
             } else {
@@ -44,7 +48,7 @@ chrome.runtime.onConnect.addListener(function (port) {
 
     port.onDisconnect.addListener(function () {
         port.onMessage.removeListener(extensionListener);
-        console.log
+        console.log('port disconnected')
         const tabs = Object.keys(connections);
         const matchingTab = tabs.filter(tab => connections[tab] == port);
         if (matchingTab.length) delete connections[matchingTab[0]];
@@ -56,14 +60,15 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (sender.tab) {
         let tabId = sender.tab.id;
         if (tabId in connections) {
-            // it's just a message for the target page, so pass it along
+            // it's just a message from the target page, so pass it along
+            console.log('posting message from inspected page to devtools')
             connections[tabId].postMessage(request);
         } else {
-            console.log('sender.tab not a known connection, must be from devtools');
-            /* if (request.tabId in connections && request.action === 'script') {
-                    chrome.scripting.executeScript(request.tabId, {file: request.content});
-            } */
+            console.log('sender.tab not a known connection, ignoring');
         }
+    } else {
+        console.log('message from content script');
+        if (request.action == 'message') console.log(request.content);
     }
     return true;
 });

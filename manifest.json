@@ -13,15 +13,5 @@
         "http://*/*",
         "https://*/*"
     ],
-    "content_scripts": [{
-        "matches": [
-          "http://*/*",
-          "https://*/*",
-          "file://*"
-        ],
-        "js": ["messageback-script.js"],
-        "all_frames": true,
-        "run_at": "document_start"
-      }],
     "manifest_version": 2
 }
