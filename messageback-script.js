@@ -5,15 +5,19 @@
     sendObjectToDevTools({ content: "Changed by page" });
 }); */
 
-document.addEventListener('click', function (e) {
-    sendObjectToDevTools({ action: 'Clicked', what:`${e.target.tagName}: ${e.target.innerText || e.target.id || e.target.className}` });
+console.log('Devtools: messageback-script loaded');
+
+window.addEventListener('click', function (e) {
+    console.log('Devtools: Click Event Detected');
+    sendObjectToDevTools({ action: 'Clicked', what: `${e.target.tagName}: ${e.target.id || e.target.innerText.slice(31) || e.target.className}` });
 });
 
-document.addEventListener('keydown', function (e) {
+window.addEventListener('keydown', function (e) {
+    console.log('Devtools: Keypress detected');
     sendObjectToDevTools({ action: 'Typed', keyVal: e.key })
 })
 
 function sendObjectToDevTools(message) {
     // The callback here can be used to execute something on receipt
-    chrome.runtime.sendMessage(message, function (message) { console.log(message.content)});
+    chrome.runtime.sendMessage(message);
 }
