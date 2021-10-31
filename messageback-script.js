@@ -9,7 +9,15 @@ console.log('Devtools: messageback-script loaded');
 
 window.addEventListener('click', function (e) {
     console.log('Devtools: Click Event Detected');
-    sendObjectToDevTools({ action: 'Clicked', what: `${e.target.tagName}: ${e.target.id || e.target.innerText.slice(31) || e.target.className}` });
+    sendObjectToDevTools({
+        action: 'Clicked',
+        what: {
+            tag: e.target.tagName,
+            nodeId: e.target.id,
+            innerText: e.target.innerText.slice(0, 31),
+            className: e.target.className
+        }
+    });
 });
 
 window.addEventListener('keydown', function (e) {
@@ -19,5 +27,5 @@ window.addEventListener('keydown', function (e) {
 
 function sendObjectToDevTools(message) {
     // The callback here can be used to execute something on receipt
-    chrome.runtime.sendMessage(message);
+    chrome.runtime.sendMessage(message, function (response) { console.log(response) });
 }

@@ -7,7 +7,6 @@
 
 const connections = {};
 
-
 chrome.runtime.onConnect.addListener(function (port) {
 
     var extensionListener = function (message, sender, sendResponse) {
@@ -21,17 +20,15 @@ chrome.runtime.onConnect.addListener(function (port) {
 
             //Evaluate script in inspectedPage
             if (message.action === 'code') {
-                chrome.tabs.executeScript(message.tabId, { code: message.content });
+                chrome.scripting.executeScript({ target: { tabId: message.tabId }, func: message.content });
 
                 //Attach script to inspectedPage
             } else if (message.action === 'script') {
-                chrome.tabs.executeScript(message.tabId, { file: message.content });
+                chrome.scripting.executeScript({
+                    target: { tabId: message.tabId },
+                    files: [message.content]
+                });
 
-            } else if (message.action === 'message') {
-                // send to the console
-                chrome.tabs.executeScript(message.tabId, { code: `console.log("${message.content}")` });
-
-                //Pass message to inspectedPage
             } else {
                 chrome.tabs.sendMessage(message.tabId, message, sendResponse);
             }
@@ -48,7 +45,7 @@ chrome.runtime.onConnect.addListener(function (port) {
 
     port.onDisconnect.addListener(function () {
         port.onMessage.removeListener(extensionListener);
-        console.log('port disconnected')
+        console.log('Devtools: port disconnected')
         const tabs = Object.keys(connections);
         const matchingTab = tabs.filter(tab => connections[tab] == port);
         if (matchingTab.length) delete connections[matchingTab[0]];
@@ -61,13 +58,14 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
         let tabId = sender.tab.id;
         if (tabId in connections) {
             // it's just a message from the target page, so pass it along
-            console.log('posting message from inspected page to devtools')
+            console.log('Devtools: posting message from inspected page to devtools');
             connections[tabId].postMessage(request);
+            sendResponse(`Devtools: User ${request.action}`);
         } else {
-            console.log('sender.tab not a known connection, ignoring');
+            console.log('Devtools: sender.tab not a known connection, ignoring');
         }
     } else {
-        console.log('message from content script');
+        console.log('Devtools: message from content script');
         if (request.action == 'message') console.log(request.content);
     }
     return true;

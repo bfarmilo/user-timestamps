@@ -28,10 +28,9 @@ const applyChaptersToVideo = (chapterData, videoFile) => new Promise(async (reso
 
         const { createWorker } = FFmpeg;
         // now run ffmpeg and return the resulting buffer
-        const worker = createWorker({ logger: ({ message }) => sendObjectToInspectedPage({ action: 'message', content: `Devtools:${message}` }) });
+        const worker = createWorker({ logger: ({ message }) => console.log(message) });
         await worker.load();
         // load files into virtual file system
-        sendObjectToInspectedPage({ action: 'message', content: 'Devtools: worker loaded' });
         await worker.write('metadata.txt', chapterData);
         await worker.write('input.mp4', videoFile);
         // command is 
@@ -92,20 +91,25 @@ function sendObjectToInspectedPage(message) {
 const writeMetadataToPanel = () => {
     document.querySelector('#metadata').innerHTML = chapterData.map(chapter => {
         const heading = `style="font-weight:bold; font-size:20px; margin: 5px 10px 0px 2px"`;
-        const entry = `style="font-size:20px; margin:5px 0px 2px 0px"`;
+        const entry = `style="font-size:20px; margin:5px 5px 0px 2px"`;
+        const activeData = chapter.display ? Object.keys(chapter.display).filter(key => !!key) : [];
         return `<div>
-            <span ${heading}>${chapter.actionNumber}</span><span ${heading}>${chapter.start/1000}s</span><span ${entry}>${chapter.action}</span>
+            <span ${heading}>${chapter.actionNumber}</span><span ${heading}>${chapter.start / 1000}s</span><span ${entry}>${chapter.action}</span>${activeData.map(val => `<span ${entry}>${chapter.display[val]}</span>`)}
         </div>`
     }).join('');
 }
+
+
 
 // set up page listeners for controls
 
 // click the 'Sync 10s' button when the video time hits 10s, this sets up the offset
 // TODO (note the +5s button will move the sync to the next 5 second increment)
 document.querySelector('#syncnow').addEventListener('click', function () {
-    sendObjectToInspectedPage({ action: 'message', content: 'Devtools: set offset at 10s' });
     videoTimeOffset = Math.round(window.performance.now()) - 10000;
+    // enable tracking on the target page
+    // inject the return message passing script
+    sendObjectToInspectedPage({ action: 'script', content: './messageback-script.js' });
     // now enable end capture button
     document.querySelector('#endcapture').disabled = false;
 }, false);
@@ -113,7 +117,6 @@ document.querySelector('#syncnow').addEventListener('click', function () {
 document.querySelector('#endcapture').addEventListener('click', function () {
     //sendObjectToInspectedPage({ action: "script", content: "inserted-script.js" });
     // click the 'End Capture' button to run metaTemplate and put in the panel, option to save-as
-    sendObjectToInspectedPage({ action: 'message', content: 'Devtools: saving metadata file to Downloads' });
     // update end time for last entry
     const lastEntry = chapterData.pop();
     lastEntry.end = getCurrentTimeStamp();
@@ -151,8 +154,8 @@ document.querySelector('#uploader').addEventListener('click', async function () 
             document.querySelector('#uploader').innerText = 'Indexing Complete'
         }
     } catch (err) {
-        document.querySelector('#uploader').innerText = 'Error'
-        sendObjectToInspectedPage({ action: 'message', content: `Devtools: ${err}` });
+        document.querySelector('#uploader').innerText = 'Error';
+        console.err(err);
     }
 }, false)
 
@@ -161,42 +164,20 @@ document.querySelector('#videotitle').addEventListener('change', function (e) {
     videoTitle = `${(new Date()).toISOString().split('T')[0]}_${e.target.value}_FullRun`;
     // clear the main field
     document.querySelector('#metadata').innerText = '';
+    //clear out chapterData
+    typedText.splice(0);
+    chapterData.splice(0);
+    chapterData.push({ start: 0, end: 0, action: 'Start Capture', actionNumber: 0 });
     // now enable sync button
     document.querySelector('#syncnow').disabled = false;
 }, false);
 
 //Works from the devtools, may need to click on page?
-const saveLogFile = (payload, fileName = 'metadata.txt') => {
-    const content = `
-function handleDownload() {
-    try {
-        const blob = new Blob([\`${payload}\`], {type: 'text/plain'});
-        const url = window.URL.createObjectURL(blob);
-        document.getElementById("myDownload").href = url;
-        setTimeout(() => {
-            window.URL.revokeObjectURL(url);
-            sendObjectToDevTools({ action: 'Download Complete'});
-            document.getElementById("myDownload").remove();
-        }, 10000);
-        console.log('Devtools: download started');
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-(function() {
-'use strict';
-document.body.insertAdjacentHTML(
-    "afterEnd",
-    \`
-    <a id="myDownload" href="#" download="${fileName}">downloading</a>
-    \`
-);
-document.getElementById("myDownload").addEventListener("click", handleDownload);
-document.getElementById("myDownload").click();
-})();
-`
-    sendObjectToInspectedPage({ action: 'code', content });
+const saveLogFile = (payload, filename = 'metadata.txt') => {
+    const blob = new Blob([payload], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    chrome.downloads.download({ url, filename });
+    return;
 }
 
 (function createChannel() {
@@ -205,17 +186,14 @@ document.getElementById("myDownload").click();
         name: "User-Action" //Given a Name
     });
 
-    sendObjectToInspectedPage({ action: 'message', content: 'Devtools: channel created' });
     // tell the background script to add the inspected window to the list of open connections
     sendObjectToInspectedPage({ action: 'init' });
-    // inject the return message passing script
-    sendObjectToInspectedPage({ action: 'script', content: './messageback-script.js' });
     // Listen to messages from the background page
     // every user action, update the last record to {end:time-videoTimeOffset-1000}, 
     // then push a {start:time-videoTimeOffset-10000, end:<same>+1, action:'Clicked <element.innerHTML>', actionNumber:length}
     port.onMessage.addListener(function (message) {
 
-        // capture the injected Download action
+        // capture the injected Download action TODO REMOVE THIS
         if (message.action === 'Download Complete') {
             //clear all values and reset
             typedText.splice(0);
@@ -230,26 +208,33 @@ document.getElementById("myDownload").click();
             return;
         }
 
-        // The Download action also fires a Click event, so ignore that
-        if (message.action == 'Clicked' && message.what.includes('myDownload')) return;
-
         // Otherwise it's a legit captured event from the running page
         let lastEntry;
         // only process if the action is Clicked or Typed, ie, it is coming from an inspected page
         if (chapterData && (message.action == 'Clicked' || message.action == 'Typed')) {
             if (message.action == 'Clicked') {
+                /*
+                        action: 'Clicked',
+        what: {
+            tag: e.target.tagName,
+            nodeId: e.target.id,
+            innerText: e.target.innerText.slice(31),
+            className: e.target.className
+        }*/
                 // first update the end time of the last chapter
                 lastEntry = chapterData.pop();
                 lastEntry.end = getCurrentTimeStamp();
                 if (lastAction == 'Typed') {
                     // concatenate the typed string
-                    lastEntry.action = `${lastAction} ${typedText.join('')}`;
+                    lastEntry.typed = typedText.join('');
                     // clear typedText
                     typedText.splice(0);
                 }
                 chapterData.push(lastEntry);
+
+                const { tag, nodeId, innerText, className } = message.what;
                 // now add in the start of the current chapter, with a placeholder for the end
-                chapterData.push({ start: lastEntry.end, end: lastEntry.end + 1, action: `${message.action} ${message.what}`, actionNumber: chapterData.length });
+                chapterData.push({ start: lastEntry.end, end: lastEntry.end + 1, action: message.action, actionNumber: chapterData.length, display: { tag, nodeId, innerText, className } });
                 lastAction = message.action;
                 port.postMessage({ action: 'status', content: `captured ${lastEntry.action}` }); //send message to page
             } else if (message.action == 'Typed' && message.keyVal !== 'Enter') {
@@ -265,7 +250,6 @@ document.getElementById("myDownload").click();
                 }
                 // add to the typedText, ignore the last enter though
                 if (message.keyVal !== 'Enter') typedText.push(message.keyVal);
-                sendObjectToInspectedPage({ action: 'message', content: `Devtools:${typedText.join('')}` });
                 lastAction = message.action;
             }
             // display the interim data on the panel
