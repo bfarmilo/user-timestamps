@@ -1,0 +1,21 @@
+{
+    "name": "UserTimestamps",
+    "description": "Simply tracks user interactions and writes them in FFMPEG Metadata format",
+    "version": "1.1",
+    "manifest_version": 3,
+    "devtools_page": "devtools.html",
+    "background": {
+        "service_worker": "background.js"
+    },
+    "permissions": [
+        "tabs",
+        "scripting",
+        "activeTab",
+        "tabs",
+        "downloads"
+    ],
+    "host_permissions": [
+        "http://*/*",
+        "https://*/*"
+    ]
+}

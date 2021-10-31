@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>User Action Timestamps</title>
+</head>
+
+<body>
+	<input id="videotitle" type="text">Target Client</input>
+	<!--<button id="starttracking" disabled="true">Click to Inject tracking script</button>-->
+	<button id="syncnow" disabled="true">Click when video is at 10s to Sync</button>
+	<button id="endcapture" disabled="true">Click when Capture Stopped</button>
+	<button id="uploader" disabled="true">Click to Apply Chapters to Video</button>
+	<div id="metadata"></div>
+	<!--include the ffmpeg WASM-->
+	<script src="ffmpeg.min.js" allow="cross-origin-isolated"></script>
+	<script src="panel.js"></script>
+
+</body>
+
+</html>
